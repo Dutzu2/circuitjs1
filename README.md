@@ -8,7 +8,11 @@ The source code for offline version of the **Circuit Simulator** with minor modi
 
 This program is distributed by me as a program for education. It is not recommended to use the program for modeling real circuits, since many components in the program are idealized.
 
-The program supports the following languages: English, Russian, Danish, German, Polish, Spanish, French, Italian, Portuguese, Czech, Norwegian, Chinese, Japanese.
+The program supports the following languages: English, Russian, Danish, German, Polish, Spanish, French, Italian, Portuguese, Czech, Norwegian, Chinese, Japanese, Romanian.
+
+### Easier mode for teachers and students
+
+A **Simple Mode** is available for beginners (students and teachers). Turn it on from **Options → Simple Mode (beginners)**. In this mode the component menu and toolbar show only the most common parts (wire, resistor, switch, capacitor, inductor, sources, basic semiconductors, meters and logic gates), and the toolbar buttons are larger and clearer. Any circuit (even one using advanced parts) can still be opened and simulated. Turn it off again to get the full set of components. The Romanian translation is selected automatically for Romanian browsers, or manually from **Options → Other Options… → Change Language → Română**.
 
 For a web version of the application see:
 
@@ -38,6 +42,18 @@ Install the dependencies in the local `node_modules` folder:
 ```
 npm install
 ```
+
+### Single portable executable (Windows)
+
+To package the whole program into **one portable `.exe`** (no installer, no folder — a single file that unpacks to a temp folder and launches itself when double-clicked):
+```
+npm run exe
+```
+What it does: builds the GWT app if needed (JDK + Maven), downloads the modified NW.js runtime automatically, bundles the app with it, then wraps everything into a single self-extracting executable at `./out/CircuitJS1_Portable_x64.exe`.
+
+Requirements: [7-Zip](https://www.7-zip.org) installed (the builder uses its `7z.exe` and `7z.sfx`). The builder downloads the NW.js runtime itself and disables NW.js checksum verification, because this is a *modified* NW.js build whose checksum intentionally differs from the official one.
+
+You can also run it from the dev menu (`npm run dev`) with the `exe` command.
 
 For full build for all platforms without rebuilding GWT app run:
 ```

@@ -75,22 +75,18 @@ public class CheckboxMenuItem extends MenuItem implements Command {
 	
 	public void setState(boolean newstate) {
 		on = newstate;
-		String s;
-        if (on)
- //       	super.setHTML("&#10004;&nbsp;"+name);
-        	s = checkBoxHtml+"&#10004;</div>"+name;
-        else
-//        	super.setHTML("&emsp;&nbsp;"+name);
-        	s = checkBoxHtml+"&nbsp;</div>"+name;
-        if (shortcut!="")
-        	if (shortcut.length()==1) {
-        	    s = s + "<div style=\"display:inline-block;width:20px;right:10px;text-align:center;position:absolute;\">"+shortcut+"</div>";
-        	} else {
-        	    // add some space so menu text doesn't overlap shortcut
-        	    s = s+ "<span style=\"display:inline-block; width: 60px;\"></span>";
-        	    s = s + "<div style=\"display:inline-block;right:10px;text-align:right;position:absolute;\">"+shortcut+"</div>";
-        	}
-        setHTML(s);
+		// Flex layout: a 15px checkbox column, the label, a flexible spacer and
+		// the shortcut right-aligned. This adapts to any (translated) label
+		// length so the text and shortcut never overlap or get clipped.
+		String check = on ? "&#10004;" : "&nbsp;";
+		String s = "<div style=\"display:flex;align-items:center;white-space:nowrap;\">"
+			+ "<span style=\"display:inline-block;width:15px;flex:0 0 auto;\">" + check + "</span>"
+			+ "<span style=\"flex:0 1 auto;\">" + name + "</span>";
+		if (shortcut != null && !shortcut.isEmpty())
+			s += "<span style=\"flex:1 1 auto;min-width:24px;\"></span>"
+				+ "<span style=\"flex:0 0 auto;padding-left:8px;color:#777;\">" + shortcut + "</span>";
+		s += "</div>";
+		setHTML(s);
 	}
 	
 	public boolean getState(){

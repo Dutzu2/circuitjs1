@@ -20,8 +20,8 @@ import java.util.HashMap;
 public class Toolbar extends HorizontalPanel {
 
     private Label modeLabel;
-    private HashMap<String, Label> highlightableButtons = new HashMap<>();
-    private Label activeButton;  // Currently active button
+    private HashMap<String, Widget> highlightableButtons = new HashMap<>();
+    private Widget activeButton;  // Currently active button (Label icon or labeled FlowPanel)
     private String SEPARATOR = "<div style=\"height:30px;width:0;border-left:2px solid grey;\"></div>";
 
     Label resistorButton;
@@ -36,6 +36,13 @@ public class Toolbar extends HorizontalPanel {
         style.setBorderColor("#ccc");
         style.setDisplay(Style.Display.FLEX);
 	setVerticalAlignment(ALIGN_MIDDLE);
+
+	// Simple Mode: a compact toolbar with text labels under each icon, so
+	// beginners can recognise the buttons without knowing the symbols.
+	if (CirSim.theSim != null && CirSim.theSim.simpleMode) {
+	    buildSimpleToolbar();
+	    return;
+	}
 
 	add(createIconButton("doc-new", "New Blank Circuit", new MyCommand("file", "newblankcircuit")));
 	add(createIconButton("folder",  "Open File...", new MyCommand("file", "importfromlocalfile")));
@@ -84,7 +91,7 @@ public class Toolbar extends HorizontalPanel {
 	add(createButtonSet(fetInfo));
 
 	add(createIconButton(inverterIcon, "InverterElm"));
-	String gateInfo[] = { andIcon, "AndGateElm", nandIcon, "NandGateElm", 
+	String gateInfo[] = { andIcon, "AndGateElm", nandIcon, "NandGateElm",
 			      orIcon, "OrGateElm", norIcon, "NorGateElm", xorIcon, "XorGateElm" };
 	add(createButtonSet(gateInfo));
 /*
@@ -109,6 +116,9 @@ public class Toolbar extends HorizontalPanel {
 
     private Label createIconButton(String iconClass, String tooltip, MyCommand command) {
         // Create a label to hold the icon
+	// In Simple Mode the buttons are a little larger and more spaced out so
+	// they are easier to read and click for beginners (kept within the
+	// fixed toolbar height of 40px to avoid clipping).
         Label iconLabel = new Label();
         iconLabel.setText(""); // No text, just an icon
 	if (iconClass.startsWith("<svg"))
@@ -117,19 +127,35 @@ public class Toolbar extends HorizontalPanel {
 	    iconLabel.getElement().addClassName("cirjsicon-" + iconClass);
         iconLabel.setTitle(Locale.LS(tooltip));
 
-        // Style the icon button
+        // Style the icon button.
 	Style style = iconLabel.getElement().getStyle();
         style.setFontSize(24, Style.Unit.PX);
         style.setColor("#333");
-        style.setPadding(1, Style.Unit.PX);
-        style.setMarginRight(5, Style.Unit.PX);
+        style.setPadding(2, Style.Unit.PX);
+        style.setMarginRight(4, Style.Unit.PX);
         style.setCursor(Style.Cursor.POINTER);
+        style.setProperty("borderRadius", "6px");
+        style.setProperty("transition", "background-color 0.12s, color 0.12s");
 	if (iconClass.startsWith("<svg"))
 	    style.setPaddingTop(5, Style.Unit.PX);
 
-        // Add hover effect for the button
-        iconLabel.addMouseOverHandler(event -> iconLabel.getElement().getStyle().setColor("#007bff"));
-        iconLabel.addMouseOutHandler(event -> iconLabel.getElement().getStyle().setColor("#333"));
+        // Add a clear hover effect (highlight box + colour) so buttons look clickable
+        iconLabel.addMouseOverHandler(event -> {
+            Style s = iconLabel.getElement().getStyle();
+            s.setColor("#007bff");
+            s.setBackgroundColor("#e6f2ff");
+        });
+        iconLabel.addMouseOutHandler(event -> {
+            Style s = iconLabel.getElement().getStyle();
+            if (iconLabel == activeButton) {
+                // keep the currently-selected tool highlighted
+                s.setColor("#007bff");
+                s.setBackgroundColor("#e6f7ff");
+            } else {
+                s.setColor("#333");
+                s.setBackgroundColor("transparent");
+            }
+        });
 
         // Add a click handler to perform the action
         iconLabel.addClickHandler(new ClickHandler() {
@@ -150,6 +176,123 @@ public class Toolbar extends HorizontalPanel {
             highlightableButtons.put(command.getItemName(), iconLabel);
 
         return iconLabel;
+    }
+
+    // ===== Simple Mode: compact toolbar with a text label under each icon =====
+    private void buildSimpleToolbar() {
+	// allow horizontal scrolling on narrow windows so nothing gets cut off
+	getElement().getStyle().setProperty("overflowX", "auto");
+	getElement().getStyle().setProperty("overflowY", "hidden");
+
+	add(createLabeledButton("doc-new", "New", new MyCommand("file", "newblankcircuit")));
+	add(createLabeledButton("folder", "Open", new MyCommand("file", "importfromlocalfile")));
+	add(createLabeledButton("floppy", "Save", new MyCommand("file", "save")));
+	add(new HTML(SEPARATOR));
+	add(createLabeledButton("ccw", "Undo", new MyCommand("edit", "undo")));
+	add(createLabeledButton("cw", "Redo", new MyCommand("edit", "redo")));
+	add(new HTML(SEPARATOR));
+	add(createLabeledButton("zoom-out", "Zoom Out", new MyCommand("zoom", "zoomout")));
+	add(createLabeledButton("zoom-in", "Zoom In", new MyCommand("zoom", "zoomin")));
+	add(new HTML(SEPARATOR));
+
+	add(createLabeledButton(wireIcon, "Wire", new MyCommand("main", "WireElm")));
+	add(makeResistorLabeledButton());
+	add(createLabeledButton(voltage2Icon, "DC Source", new MyCommand("main", "DCVoltageElm")));
+	add(createLabeledButton(groundIcon, "Ground", new MyCommand("main", "GroundElm")));
+	add(createLabeledButton(switchIcon, "Switch", new MyCommand("main", "SwitchElm")));
+	add(createLabeledButton(capacitorIcon, "Capacitor", new MyCommand("main", "CapacitorElm")));
+	add(createLabeledButton(inductIcon, "Inductor", new MyCommand("main", "InductorElm")));
+	add(createLabeledButton(diodeIcon, "Diode", new MyCommand("main", "DiodeElm")));
+	add(createLabeledButton(transistorIcon, "Transistor", new MyCommand("main", "NTransistorElm")));
+
+	add(new HTML(SEPARATOR));
+	// measurement instruments
+	add(createLabeledButton(voltmeterIcon, "Voltmeter", new MyCommand("main", "ProbeElm")));
+	add(createLabeledButton(ammeterIcon, "Ammeter", new MyCommand("main", "AmmeterElm")));
+	add(createLabeledButton(ohmmeterIcon, "Ohmmeter", new MyCommand("main", "OhmMeterElm")));
+	add(createLabeledButton(wattmeterIcon, "Wattmeter", new MyCommand("main", "WattmeterElm")));
+    }
+
+    // A labeled vertical toolbar button: icon on top, short caption below.
+    private Widget createLabeledButton(String iconClass, String caption, final MyCommand command) {
+	final FlowPanel btn = new FlowPanel();
+	btn.setStyleName("tbLabeledBtn");
+	btn.setTitle(Locale.LS(caption));
+
+	Label icon = new Label("");
+	if (iconClass.startsWith("<svg"))
+	    icon.getElement().setInnerHTML(makeSvg(iconClass, 26));
+	else
+	    icon.getElement().addClassName("cirjsicon-" + iconClass);
+	Style ist = icon.getElement().getStyle();
+	ist.setFontSize(26, Style.Unit.PX);
+	ist.setColor("#333");
+	ist.setLineHeight(26, Style.Unit.PX);
+	btn.add(icon);
+
+	Label cap = new Label(Locale.LS(caption));
+	cap.setStyleName("tbCaption");
+	btn.add(cap);
+
+	final boolean isMain = command.getMenuName().equals("main");
+	if (isMain) {
+	    String sc = CirSim.theSim.getShortcutForClass(command.getItemName());
+	    if (sc != null && !sc.isEmpty()) {
+		Label key = new Label(sc);
+		key.setStyleName("tbShortcut");
+		btn.add(key);
+	    }
+	}
+	btn.addDomHandler(new ClickHandler() {
+	    public void onClick(ClickEvent event) {
+		if (isMain && btn == activeButton) {
+		    new MyCommand("main", "Select").execute();
+		    activeButton = null;
+		} else
+		    command.execute();
+	    }
+	}, ClickEvent.getType());
+
+	if (isMain)
+	    highlightableButtons.put(command.getItemName(), btn);
+	return btn;
+    }
+
+    // Resistor labeled button - keeps the inner icon in resistorButton so the
+    // European/US resistor symbol can still be swapped via setEuroResistors().
+    private Widget makeResistorLabeledButton() {
+	final FlowPanel btn = new FlowPanel();
+	btn.setStyleName("tbLabeledBtn");
+	btn.setTitle(Locale.LS("Resistor"));
+
+	resistorButton = new Label("");
+	resistorButton.getElement().setInnerHTML(makeSvg(resistorIcon, 26));
+	resistorButton.getElement().getStyle().setColor("#333");
+	btn.add(resistorButton);
+
+	Label cap = new Label(Locale.LS("Resistor"));
+	cap.setStyleName("tbCaption");
+	btn.add(cap);
+
+	String sc = CirSim.theSim.getShortcutForClass("ResistorElm");
+	if (sc != null && !sc.isEmpty()) {
+	    Label key = new Label(sc);
+	    key.setStyleName("tbShortcut");
+	    btn.add(key);
+	}
+
+	final MyCommand command = new MyCommand("main", "ResistorElm");
+	btn.addDomHandler(new ClickHandler() {
+	    public void onClick(ClickEvent event) {
+		if (btn == activeButton) {
+		    new MyCommand("main", "Select").execute();
+		    activeButton = null;
+		} else
+		    command.execute();
+	    }
+	}, ClickEvent.getType());
+	highlightableButtons.put("ResistorElm", btn);
+	return btn;
     }
 
     String makeSvg(String s, int size) {
@@ -250,7 +393,7 @@ public class Toolbar extends HorizontalPanel {
         }
 
         // Activate the new button
-        Label newActiveButton = highlightableButtons.get(key);
+        Widget newActiveButton = highlightableButtons.get(key);
         if (newActiveButton != null) {
             newActiveButton.getElement().getStyle().setColor("#007bff"); // Active color
             newActiveButton.getElement().getStyle().setBackgroundColor("#e6f7ff");
@@ -266,6 +409,21 @@ public class Toolbar extends HorizontalPanel {
            "<line x1='5' y1='45' x2='95' y2='5' stroke='currentColor' stroke-width='8' /> " +
            "<circle cx='5' cy='45' r='10' fill='currentColor' /><circle cx='95' cy='5' r='10' fill='currentColor' /> " +
            "</g></svg>";
+
+    // Measurement instruments: a circle with the unit letter (standard schematic symbol).
+    private String meterIcon(String letter) {
+	return "<svg><g>" +
+	    "<line x1='0' y1='12' x2='4' y2='12' stroke='currentColor' stroke-width='1.8' stroke-linecap='round'/>" +
+	    "<line x1='20' y1='12' x2='24' y2='12' stroke='currentColor' stroke-width='1.8' stroke-linecap='round'/>" +
+	    "<circle cx='12' cy='12' r='8' fill='none' stroke='currentColor' stroke-width='1.8'/>" +
+	    "<text x='12' y='12' font-family='sans-serif' font-size='11' font-weight='bold' " +
+	    "text-anchor='middle' dominant-baseline='central' fill='currentColor'>" + letter + "</text>" +
+	    "</g></svg>";
+    }
+    final String voltmeterIcon = meterIcon("V");
+    final String ammeterIcon = meterIcon("A");
+    final String ohmmeterIcon = meterIcon(String.valueOf((char) 0x03A9)); // Ω
+    final String wattmeterIcon = meterIcon("W");
 
     final String resistorIcon = "<svg> <g transform='scale(.5,.5) translate(-544,-297)'>" +
       "<path stroke='#000000' d=' M 544 320 L 552 320' stroke-width='3'/>" +

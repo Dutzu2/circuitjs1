@@ -62,6 +62,7 @@ class EditDialog extends Dialog {
 		elm = ce;
 //		setLayout(new EditDialogLayout());
 		mainPanel=new VerticalPanel();
+		mainPanel.addStyleName("editDialogBody");
 		setWidget(mainPanel);
 		einfos = new EditInfo[10];
 //		noCommaFormat = DecimalFormat.getInstance();
@@ -80,6 +81,7 @@ class EditDialog extends Dialog {
 			}
 		});
 		bottomButtonPanel.add(okButton = new Button(Locale.LS("OK")));
+		okButton.addStyleName("dialog-primary");
 		okButton.addClickHandler(new ClickHandler() {
 			public void onClick(ClickEvent event) {
 				apply();

@@ -97,6 +97,7 @@ import com.google.gwt.user.client.ui.PopupPanel;
 import static com.google.gwt.event.dom.client.KeyCodes.*;
 import com.google.gwt.user.client.ui.Frame;
 import com.google.gwt.user.client.ui.Widget;
+import com.google.gwt.user.client.ui.HTML;
 import com.lushprojects.circuitjs1.client.util.Locale;
 import com.lushprojects.circuitjs1.client.util.PerfMonitor;
 import com.google.gwt.user.client.Window.ClosingEvent;
@@ -143,6 +144,8 @@ MouseOutHandler, MouseWheelHandler {
     CheckboxMenuItem mouseWheelEditCheckItem;
     CheckboxMenuItem toolbarCheckItem;
     CheckboxMenuItem mouseModeCheckItem;
+    CheckboxMenuItem simpleModeCheckItem;
+    boolean simpleMode = false;  // simplified UI for beginners (students/teachers)
     private Label powerLabel;
     private Label titleLabel;
     private Scrollbar speedBar;
@@ -312,8 +315,9 @@ MouseOutHandler, MouseWheelHandler {
     int canvasWidth, canvasHeight;
 
     static int MENUBARHEIGHT = 30;
-    static final int TOOLBARHEIGHT = 40;
+    static int TOOLBARHEIGHT = 40;  // taller in Simple Mode to fit labeled buttons
     static int VERTICALPANELWIDTH = 166; // default
+    static final int BINDPANELWIDTH = 132; // left mouse cheat-sheet (Simple Mode)
     static final int POSTGRABSQ = 25;
     static final int MINPOSTGRABSIZE = 256;
     final Timer timer = new Timer() {
@@ -365,6 +369,8 @@ MouseOutHandler, MouseWheelHandler {
 
     	if (isSidePanelCheckboxChecked() && lstor.getItem("MOD_overlayingSidebar")=="false")
     	    width=width-VERTICALPANELWIDTH;
+    	if (simpleMode)   // account for the left mouse cheat-sheet panel
+    	    width=width-BINDPANELWIDTH;
 	if (toolbarCheckItem.getState())
 	    height -= TOOLBARHEIGHT;
 
@@ -600,6 +606,10 @@ MouseOutHandler, MouseWheelHandler {
 		    getOptionFromStorage("conventionalCurrent", true));
 	    noEditing = !qp.getBooleanValue("editable", true);
 	    mouseWheelEdit = qp.getBooleanValue("mouseWheelEdit", getOptionFromStorage("mouseWheelEdit", true));
+	    // default to Simple Mode for new users (education build); remembered once changed
+	    simpleMode = qp.getBooleanValue("simpleMode", getOptionFromStorage("simpleMode", true));
+	    if (simpleMode)
+		TOOLBARHEIGHT = 72;  // room for the icon + caption + shortcut key under each button
 	    positiveColor = qp.getValue("positiveColor");
 	    negativeColor = qp.getValue("negativeColor");
 	    neutralColor = qp.getValue("neutralColor");
@@ -778,6 +788,21 @@ MouseOutHandler, MouseWheelHandler {
 
 	optionsMenuBar = m = new MenuBar(true );
 	menuBar.addItem(Locale.LS("Options"), optionsMenuBar);
+	m.addItem(simpleModeCheckItem = new CheckboxMenuItem(Locale.LS("Simple Mode (beginners)"),
+		new Command() { public void execute(){
+		    boolean newState = simpleModeCheckItem.getState();
+		    String msg = newState ? "Switch to the simplified mode? The app will restart."
+					  : "Switch to the full (advanced) mode? The app will restart.";
+		    if (Window.confirm(Locale.LS(msg))) {
+			setOptionInStorage("simpleMode", newState);
+			Window.Location.reload();
+		    } else
+			// revert the checkbox if the user cancels the restart
+			simpleModeCheckItem.setState(!newState);
+		}
+	}));
+	simpleModeCheckItem.setState(simpleMode);
+	m.addSeparator();
 	m.addItem(dotsCheckItem = new CheckboxMenuItem(Locale.LS("Show Current")));
 	dotsCheckItem.setState(true);
 	m.addItem(voltsCheckItem = new CheckboxMenuItem(Locale.LS("Show Voltage"),
@@ -900,6 +925,9 @@ MouseOutHandler, MouseWheelHandler {
 		DOM.appendChild(layoutPanel.getElement(), sidePanelCheckboxLabel);
 	    layoutPanel.addEast(verticalPanel, VERTICALPANELWIDTH);
 	}
+	// small left-hand cheat-sheet of mouse shortcuts (Simple Mode, for beginners)
+	if (simpleMode)
+	    layoutPanel.addWest(buildBindingsPanel(), BINDPANELWIDTH);
 	menuBar.getElement().insertFirst(menuBar.getElement().getChild(1));
 	menuBar.getElement().getFirstChildElement().setAttribute("onclick", "document.getElementsByClassName('toptrigger')[0].checked = false");
 	RootLayoutPanel.get().add(layoutPanel);
@@ -1122,8 +1150,13 @@ MouseOutHandler, MouseWheelHandler {
 	    }
 	});
 	setupJSInterface();
-	
+
 	setSimRunning(running);
+
+	// Show the welcome screen for beginners (Simple Mode), unless dismissed.
+	if (simpleMode && !getOptionFromStorage("hideWelcome", false)
+		&& startCircuitText == null && startCircuitLink == null && startCircuit == null)
+	    new WelcomeDialog(this);
     }
 
     void setColors(String positiveColor, String negativeColor, String neutralColor, String selectColor, String currentColor) {
@@ -1173,10 +1206,14 @@ MouseOutHandler, MouseWheelHandler {
     }
 
     MenuItem menuItemWithShortcut(String icon, String text, String shortcut, MyCommand cmd) {
-	final String edithtml="<div style=\"white-space:nowrap\"><div style=\"display:inline-block;width:100%;\"><i class=\"cirjsicon-";
-	String nbsp = "&nbsp;";
-	if (icon=="") nbsp="";
-	String sn=edithtml + icon + "\"></i>" + nbsp + Locale.LS(text) + "</div>" + shortcut + "</div>";
+	// Flex layout: label on the left, a flexible spacer, then the shortcut
+	// right-aligned. This keeps the shortcut fully visible no matter how long
+	// the (translated) label is, so nothing gets clipped off the menu edge.
+	String nbsp = icon.equals("") ? "" : "&nbsp;";
+	String sn = "<div style=\"display:flex;align-items:center;white-space:nowrap;\">"
+		+ "<span><i class=\"cirjsicon-" + icon + "\"></i>" + nbsp + Locale.LS(text) + "</span>"
+		+ "<span style=\"flex:1 1 auto;min-width:28px;\"></span>"
+		+ "<span style=\"flex:0 0 auto;color:#777;\">" + shortcut + "</span></div>";
 	return new MenuItem(SafeHtmlUtils.fromTrustedString(sn), cmd);
     }
     
@@ -1340,6 +1377,10 @@ MouseOutHandler, MouseWheelHandler {
     
     // this is called twice, once for the Draw menu, once for the right mouse popup menu
     public void composeMainMenu(MenuBar mainMenuBar, int num) {
+    	if (simpleMode) {
+    	    composeSimpleMainMenu(mainMenuBar, num);
+    	    return;
+    	}
     	mainMenuBar.addItem(getClassCheckItem(Locale.LS("Add Wire"), "WireElm"));
     	mainMenuBar.addItem(getClassCheckItem(Locale.LS("Add Resistor"), "ResistorElm"));
 
@@ -1521,7 +1562,88 @@ MouseOutHandler, MouseWheelHandler {
     	mainMenuBar.addItem(mi=getClassCheckItem(Locale.LS("Select/Drag Sel"), "Select"));
 	mi.setShortcut(Locale.LS("(space or Shift-drag)"));
     }
-    
+
+    // Simplified "Draw" menu for beginners (students/teachers): only the most
+    // common components, grouped into a few easy-to-understand categories.
+    // The full set of components is still available by turning off Simple Mode
+    // in the Options menu, and any circuit (even one using advanced parts) can
+    // still be opened and simulated in this mode.
+    public void composeSimpleMainMenu(MenuBar mainMenuBar, int num) {
+    	mainMenuBar.addItem(getClassCheckItem(Locale.LS("Add Wire"), "WireElm"));
+    	mainMenuBar.addItem(getClassCheckItem(Locale.LS("Add Resistor"), "ResistorElm"));
+
+    	MenuBar basicMenuBar = new MenuBar(true);
+    	basicMenuBar.addItem(getClassCheckItem(Locale.LS("Add Switch"), "SwitchElm"));
+    	basicMenuBar.addItem(getClassCheckItem(Locale.LS("Add Push Switch"), "PushSwitchElm"));
+    	basicMenuBar.addItem(getClassCheckItem(Locale.LS("Add SPDT Switch"), "Switch2Elm"));
+    	basicMenuBar.addItem(getClassCheckItem(Locale.LS("Add Potentiometer"), "PotElm"));
+    	basicMenuBar.addItem(getClassCheckItem(Locale.LS("Add Capacitor"), "CapacitorElm"));
+    	basicMenuBar.addItem(getClassCheckItem(Locale.LS("Add Inductor"), "InductorElm"));
+    	basicMenuBar.addItem(getClassCheckItem(Locale.LS("Add Transformer"), "TransformerElm"));
+    	basicMenuBar.addItem(getClassCheckItem(Locale.LS("Add Fuse"), "FuseElm"));
+    	basicMenuBar.addItem(getClassCheckItem(Locale.LS("Add Lamp"), "LampElm"));
+    	mainMenuBar.addItem(SafeHtmlUtils.fromTrustedString(CheckboxMenuItem.checkBoxHtml+Locale.LS("&nbsp;</div>Basic Components")), basicMenuBar);
+
+    	MenuBar sourcesMenuBar = new MenuBar(true);
+    	sourcesMenuBar.addItem(getClassCheckItem(Locale.LS("Add Ground"), "GroundElm"));
+    	sourcesMenuBar.addItem(getClassCheckItem(Locale.LS("Add Voltage Source (2-terminal)"), "DCVoltageElm"));
+    	sourcesMenuBar.addItem(getClassCheckItem(Locale.LS("Add A/C Voltage Source (2-terminal)"), "ACVoltageElm"));
+    	sourcesMenuBar.addItem(getClassCheckItem(Locale.LS("Add Voltage Source (1-terminal)"), "RailElm"));
+    	sourcesMenuBar.addItem(getClassCheckItem(Locale.LS("Add Current Source"), "CurrentElm"));
+    	mainMenuBar.addItem(SafeHtmlUtils.fromTrustedString(CheckboxMenuItem.checkBoxHtml+Locale.LS("&nbsp;</div>Sources")), sourcesMenuBar);
+
+    	MenuBar semiMenuBar = new MenuBar(true);
+    	semiMenuBar.addItem(getClassCheckItem(Locale.LS("Add Diode"), "DiodeElm"));
+    	semiMenuBar.addItem(getClassCheckItem(Locale.LS("Add Zener Diode"), "ZenerElm"));
+    	semiMenuBar.addItem(getClassCheckItem(Locale.LS("Add LED"), "LEDElm"));
+    	semiMenuBar.addItem(getClassCheckItem(Locale.LS("Add Transistor (bipolar, NPN)"), "NTransistorElm"));
+    	semiMenuBar.addItem(getClassCheckItem(Locale.LS("Add Transistor (bipolar, PNP)"), "PTransistorElm"));
+    	semiMenuBar.addItem(getClassCheckItem(Locale.LS("Add MOSFET (N-Channel)"), "NMosfetElm"));
+    	mainMenuBar.addItem(SafeHtmlUtils.fromTrustedString(CheckboxMenuItem.checkBoxHtml+Locale.LS("&nbsp;</div>Semiconductors")), semiMenuBar);
+
+    	MenuBar measureMenuBar = new MenuBar(true);
+    	measureMenuBar.addItem(getClassCheckItem(Locale.LS("Add Voltmeter/Scope Probe"), "ProbeElm"));
+    	measureMenuBar.addItem(getClassCheckItem(Locale.LS("Add Ammeter"), "AmmeterElm"));
+    	measureMenuBar.addItem(getClassCheckItem(Locale.LS("Add Ohmmeter"), "OhmMeterElm"));
+    	measureMenuBar.addItem(getClassCheckItem(Locale.LS("Add Wattmeter"), "WattmeterElm"));
+    	mainMenuBar.addItem(SafeHtmlUtils.fromTrustedString(CheckboxMenuItem.checkBoxHtml+Locale.LS("&nbsp;</div>Measurement")), measureMenuBar);
+
+    	MenuBar logicMenuBar = new MenuBar(true);
+    	logicMenuBar.addItem(getClassCheckItem(Locale.LS("Add Logic Input"), "LogicInputElm"));
+    	logicMenuBar.addItem(getClassCheckItem(Locale.LS("Add Logic Output"), "LogicOutputElm"));
+    	logicMenuBar.addItem(getClassCheckItem(Locale.LS("Add Inverter"), "InverterElm"));
+    	logicMenuBar.addItem(getClassCheckItem(Locale.LS("Add AND Gate"), "AndGateElm"));
+    	logicMenuBar.addItem(getClassCheckItem(Locale.LS("Add OR Gate"), "OrGateElm"));
+    	logicMenuBar.addItem(getClassCheckItem(Locale.LS("Add NAND Gate"), "NandGateElm"));
+    	logicMenuBar.addItem(getClassCheckItem(Locale.LS("Add NOR Gate"), "NorGateElm"));
+    	logicMenuBar.addItem(getClassCheckItem(Locale.LS("Add XOR Gate"), "XorGateElm"));
+    	mainMenuBar.addItem(SafeHtmlUtils.fromTrustedString(CheckboxMenuItem.checkBoxHtml+Locale.LS("&nbsp;</div>Logic Gates")), logicMenuBar);
+
+    	MenuBar labelsMenuBar = new MenuBar(true);
+    	labelsMenuBar.addItem(getClassCheckItem(Locale.LS("Add Text"), "TextElm"));
+    	labelsMenuBar.addItem(getClassCheckItem(Locale.LS("Add Box"), "BoxElm"));
+    	labelsMenuBar.addItem(getClassCheckItem(Locale.LS("Add Line"), "LineElm"));
+    	labelsMenuBar.addItem(getClassCheckItem(Locale.LS("Add Labeled Node"), "LabeledNodeElm"));
+    	mainMenuBar.addItem(SafeHtmlUtils.fromTrustedString(CheckboxMenuItem.checkBoxHtml+Locale.LS("&nbsp;</div>Outputs and Labels")), labelsMenuBar);
+
+    	// keep the subcircuit menu bars initialised so composeSubcircuitMenu() never sees null
+    	if (subcircuitMenuBar == null)
+    	    subcircuitMenuBar = new MenuBar[2];
+    	subcircuitMenuBar[num] = new MenuBar(true);
+
+    	mainMenuBar.addSeparator();
+
+    	MenuBar dragMenuBar = new MenuBar(true);
+    	CheckboxMenuItem mi;
+    	dragMenuBar.addItem(mi=getClassCheckItem(Locale.LS("Drag All"), "DragAll"));
+    	mi.setShortcut(Locale.LS("(Alt-drag)"));
+    	dragMenuBar.addItem(getClassCheckItem(Locale.LS("Drag Selected"), "DragSelected"));
+    	mainMenuBar.addItem(SafeHtmlUtils.fromTrustedString(CheckboxMenuItem.checkBoxHtml+Locale.LS("&nbsp;</div>Drag")), dragMenuBar);
+
+    	mainMenuBar.addItem(mi=getClassCheckItem(Locale.LS("Select/Drag Sel"), "Select"));
+	mi.setShortcut(Locale.LS("(space or Shift-drag)"));
+    }
+
     void composeSubcircuitMenu() {
 	if (subcircuitMenuBar == null)
 	    return;
@@ -6069,6 +6191,52 @@ MouseOutHandler, MouseWheelHandler {
 
     String getLabelTextForClass(String cls) {
 	return classToLabelMap.get(cls);
+    }
+
+    // Return the single-key keyboard shortcut for a component class (e.g. "R" for
+    // a resistor), or "" if it has none. Reverse lookup of the shortcuts[] table,
+    // which is filled in by getClassCheckItem() when the menus are built.
+    String getShortcutForClass(String cls) {
+	if (shortcuts == null || cls == null)
+	    return "";
+	for (int i = 0; i != shortcuts.length; i++)
+	    if (cls.equals(shortcuts[i])) {
+		// Shortcuts are case-sensitive: a lowercase letter means "press that
+		// key", an uppercase letter means "press Shift + that key" (e.g. 'l'
+		// is the LED but 'L'/Shift+L is the inductor).
+		char c = (char) i;
+		if (c >= 'A' && c <= 'Z')
+		    return "Shift+" + c;
+		if (c >= 'a' && c <= 'z')
+		    return String.valueOf((char) (c - 'a' + 'A'));
+		return String.valueOf(c);
+	    }
+	return "";
+    }
+
+    // Small left-hand panel with a cheat-sheet of mouse/keyboard gestures, to
+    // help beginners discover the "hidden" interactions (Alt-drag, etc.).
+    Widget buildBindingsPanel() {
+	String mod = isMac ? "Cmd" : "Ctrl";
+	String drag = Locale.LS("drag");
+	StringBuilder sb = new StringBuilder();
+	sb.append("<div class='bindPanel'>");
+	sb.append("<div class='bindTitle'>").append(Locale.LS("Mouse controls")).append("</div>");
+	sb.append(bindRow("Alt + " + drag, Locale.LS("Drag All")));
+	sb.append(bindRow("Shift + " + drag, Locale.LS("Select")));
+	sb.append(bindRow(mod + " + " + drag, Locale.LS("Drag Post")));
+	sb.append(bindRow("Alt+Shift + " + drag, Locale.LS("Drag Row")));
+	sb.append(bindRow(Locale.LS("Double-click"), Locale.LS("Edit part")));
+	sb.append(bindRow(Locale.LS("Right-click"), Locale.LS("Menu")));
+	sb.append(bindRow(Locale.LS("Scroll"), Locale.LS("Zoom")));
+	sb.append(bindRow(Locale.LS("Space"), Locale.LS("Select")));
+	sb.append("</div>");
+	return new HTML(sb.toString());
+    }
+
+    String bindRow(String key, String action) {
+	return "<div class='bindRow'><span class='bindKey'>" + key
+		+ "</span><span class='bindAct'>" + action + "</span></div>";
     }
 
     // factors a matrix into upper and lower triangular matrices by

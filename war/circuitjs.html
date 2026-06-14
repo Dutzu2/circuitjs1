@@ -253,6 +253,218 @@
             z-index: 2;
         }
 
+        /* =========================================================
+           Friendlier theme for students and teachers
+           (clearer menus, dialogs and buttons)
+           ========================================================= */
+
+        /* Menu bar: clearer, slightly larger, with hover highlight */
+        .gwt-MenuBar-horizontal {
+            font-size: 13px !important;
+            background: #eef2f6 !important;
+            border-bottom: 1px solid #d4dde4 !important;
+        }
+        .gwt-MenuBar-horizontal > table > tbody > tr > td.gwt-MenuItem {
+            padding: 4px 12px !important;
+            border-radius: 4px;
+        }
+        .gwt-MenuItem {
+            font-size: 13px !important;
+            padding: 5px 16px 5px 12px !important;
+        }
+        .gwt-MenuItem-selected {
+            background: #1976d2 !important;
+            color: #ffffff !important;
+        }
+
+        /* Dropdown popups: card look */
+        .gwt-MenuBarPopup .gwt-MenuBar {
+            background: #ffffff;
+            border: 1px solid #cfd8dc;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+            border-radius: 6px;
+            padding: 4px 0;
+        }
+
+        /* Dialog boxes: rounded card with coloured title bar */
+        .gwt-DialogBox, .gwt-DialogBox-CloseButton {
+            border-radius: 8px;
+        }
+        .gwt-DialogBox .Caption {
+            background: #1976d2 !important;
+            color: #ffffff !important;
+            font-weight: bold;
+            padding: 8px 14px !important;
+            border: none !important;
+            border-radius: 8px 8px 0 0;
+        }
+        .gwt-DialogBox .dialogContent {
+            padding: 4px;
+        }
+
+        /* Buttons: clear, rounded, with hover */
+        .gwt-Button {
+            font-size: 13px;
+            padding: 6px 14px;
+            border-radius: 6px;
+            border: 1px solid #bcc6cf;
+            background: #f1f4f7;
+            color: #222;
+            cursor: pointer;
+            transition: background 0.12s, border-color 0.12s;
+        }
+        .gwt-Button:hover {
+            background: #e1e9f2;
+            border-color: #1976d2;
+        }
+        .gwt-Button:active {
+            background: #d2deec;
+        }
+
+        /* Welcome screen */
+        .welcome-dialog .gwt-Label, .welcome-dialog p, .welcome-dialog li {
+            color: #222;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+        .welcome-dialog .welcome-body {
+            padding: 6px 18px 14px 18px;
+            max-width: 460px;
+        }
+        .welcome-dialog h2 {
+            margin: 6px 0 10px 0;
+            color: #0d47a1;
+        }
+        .welcome-dialog ul {
+            margin: 8px 0 14px 0;
+            padding-left: 22px;
+        }
+        .welcome-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 6px;
+        }
+        .welcome-primary.gwt-Button {
+            background: #1976d2;
+            color: #ffffff;
+            border-color: #1565c0;
+            font-weight: bold;
+        }
+        .welcome-primary.gwt-Button:hover {
+            background: #1565c0;
+        }
+
+        /* Toolbar labelled buttons (Simple Mode) */
+        .tbLabeledBtn {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            cursor: pointer;
+            border-radius: 6px;
+            padding: 2px 4px;
+            margin-right: 4px;
+            transition: background-color 0.12s, color 0.12s;
+        }
+        .tbLabeledBtn:hover {
+            background-color: #e6f2ff;
+        }
+        .tbLabeledBtn .tbCaption {
+            font-size: 11px;
+            color: #333;
+            margin-top: -2px;
+            white-space: nowrap;
+        }
+        /* keyboard shortcut shown as a small key badge under the caption */
+        .tbLabeledBtn .tbShortcut {
+            font-size: 10px;
+            font-weight: bold;
+            color: #1976d2;
+            background: #f3f7fb;
+            border: 1px solid #cfd8dc;
+            border-radius: 3px;
+            padding: 0 5px;
+            line-height: 14px;
+            margin-top: 2px;
+            white-space: nowrap;
+        }
+
+        /* Inputs: text boxes, dropdowns and text areas */
+        .gwt-TextBox, .gwt-TextArea, .gwt-ListBox,
+        .gwt-DialogBox input[type="text"], .gwt-DialogBox textarea, .gwt-DialogBox select {
+            font-size: 14px;
+            padding: 6px 8px;
+            border: 1px solid #c4ccd4;
+            border-radius: 6px;
+            box-sizing: border-box;
+            background: #ffffff;
+            color: #222;
+            outline: none;
+        }
+        .gwt-TextBox:focus, .gwt-TextArea:focus, .gwt-ListBox:focus,
+        .gwt-DialogBox input[type="text"]:focus, .gwt-DialogBox textarea:focus, .gwt-DialogBox select:focus {
+            border-color: #1976d2;
+            box-shadow: 0 0 0 3px rgba(25,118,210,0.15);
+        }
+
+        /* Edit Component (and similar) dialog body */
+        .editDialogBody {
+            padding: 14px 16px 8px 16px;
+            min-width: 230px;
+        }
+        .editDialogBody .gwt-Label, .editDialogBody .gwt-HTML {
+            font-size: 13px;
+            color: #556;
+        }
+        .editDialogBody .gwt-TextBox { min-width: 200px; }
+
+        /* Dialog buttons: spacing + a primary (OK) variant */
+        .gwt-DialogBox .gwt-Button { margin: 12px 4px 2px 4px; }
+        .dialog-primary.gwt-Button {
+            background: #1976d2;
+            color: #ffffff;
+            border-color: #1565c0;
+            font-weight: bold;
+        }
+        .dialog-primary.gwt-Button:hover { background: #1565c0; }
+
+        /* Left-hand cheat-sheet of mouse/keyboard gestures (Simple Mode) */
+        .bindPanel {
+            height: 100%;
+            box-sizing: border-box;
+            background: #fafbfc;
+            border-right: 1px solid #d4dde4;
+            padding: 8px;
+            font-family: Arial, sans-serif;
+            overflow-y: auto;
+        }
+        .bindTitle {
+            font-weight: bold;
+            font-size: 12px;
+            color: #0d47a1;
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #d4dde4;
+        }
+        .bindRow { margin-bottom: 9px; }
+        .bindKey {
+            display: block;
+            font-size: 11px;
+            font-weight: bold;
+            color: #1976d2;
+            background: #eef4fb;
+            border: 1px solid #cfd8dc;
+            border-radius: 4px;
+            padding: 1px 5px;
+        }
+        .bindAct {
+            display: block;
+            font-size: 11px;
+            color: #444;
+            margin-top: 2px;
+        }
+
         </style>
 
         <script src="js/sys.js"></script>

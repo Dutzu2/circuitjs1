@@ -56,8 +56,10 @@ public class circuitjs1 implements EntryPoint {
             if (navigator.languages.length > 0) {
                 return navigator.languages[0];
             } else {
-                // In Electron, navigator.languages returns an empty array
-                return "en-US";
+                // In Electron/NW.js, navigator.languages returns an empty array.
+                // This is a Romanian education build, so default the desktop app
+                // to Romanian (users can still change it from the Options menu).
+                return "ro";
             }
         } else {
             return (navigator.language || navigator.userLanguage);  

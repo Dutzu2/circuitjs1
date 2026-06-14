@@ -1,4 +1,5 @@
-const { statSync } = require('node:fs');
+const { statSync, existsSync, readFileSync, writeFileSync, rmSync, mkdirSync, createWriteStream } = require('node:fs');
+const https = require('node:https');
 const readline = require('readline').createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -18,6 +19,7 @@ const menu="\n1 - check steps      | 2 - run devmode        | 3 - run GWT app\n"
             //+"'8 [x32,x64]' - build from bin for linux only\n"
             //+"'9 [x64,arm64]' - build from bin for macOS only\n"
             +"   full - full (re)build for all platforms    | 0 - exit \n"
+            +"   exe  - build ONE portable .exe (Windows x64)\n"
             +"(* - build from bin for windows (win), linux or macOS only)\n";
 
 const stepNames = [
@@ -163,11 +165,12 @@ function runDevmode(){
         async function(){
         const interval = setInterval(() => {
             fetch("http://127.0.0.1:8888")
-            .then(function (response) {
+            .then(async function (response) {
                 if (response.status >= 200 && response.status < 300) {
                     clearInterval(interval);
+                    const nwPath = await require('nw').findpath();
                     child_process.spawn(
-                    require('nw').findpath(),
+                    nwPath,
                     ['./scripts/devmode'],
                     {
                         cwd: ".",
@@ -193,9 +196,10 @@ function runDevmode(){
 
 async function runGWT(){
     if (!stateOfSteps[1]) await buildGWT();
+    const nwPath = await require('nw').findpath();
     child_process.spawn(
-        require('nw').findpath(),
-        ['./target/site'],
+    nwPath,
+    ['./target/site'],
         {
             cwd: ".",
             detached: true,
@@ -228,6 +232,7 @@ async function getBin(platform, arch){
         flavor: "normal",
         downloadUrl: "https://github.com/SEVA77/nw.js_mod/releases/download",
         manifestUrl: "https://raw.githubusercontent.com/SEVA77/nw.js_mod/main/versions.json",
+        shaSum: false, // modified NW.js build -> official checksum won't match
         cacheDir: "./out/nwjs_cache",
         srcDir: "target/site"
     }).catch((err)=>{console.error("ERROR: The archive "+archivePath.slice(13)+" is damaged. Remove it and try again.")})
@@ -252,7 +257,9 @@ async function buildRelease(platform, arch){
         arch: arch,
         flavor: "normal",
         cacheDir: "./out/nwjs_cache",
+        downloadUrl: "https://github.com/SEVA77/nw.js_mod/releases/download",
         manifestUrl: "https://raw.githubusercontent.com/SEVA77/nw.js_mod/main/versions.json",
+        shaSum: false, // this is a MODIFIED NW.js build, so the official checksum won't match
         srcDir: "target/site",
         outDir: "./out/"+platform+"-"+arch+"/CircuitJS1 Desktop Mod",
         glob: false,
@@ -307,6 +314,131 @@ async function fullBuild(){
     await buildGWT();
     await getAllBins();
     await buildAll();
+}
+
+// ---- Single portable .exe builder -------------------------------------------
+// Packs the whole NW.js Windows app into ONE self-extracting executable using
+// 7-Zip's SFX module. Double-clicking the result unpacks the app to a temp
+// folder and launches it automatically (no install needed).
+
+function find7zPath(file){
+    const cands = [
+        'C:/Program Files/7-Zip/' + file,
+        'C:/Program Files (x86)/7-Zip/' + file
+    ];
+    for (const c of cands) if (existsSync(c)) return c;
+    return null;
+}
+
+function spawnPromise(cmd, args, opts){
+    return new Promise((res, rej) => {
+        const p = child_process.spawn(cmd, args, Object.assign({ stdio: 'inherit' }, opts));
+        p.on('close', code => code === 0 ? res() : rej(new Error(cmd + ' exited with code ' + code)));
+        p.on('error', rej);
+    });
+}
+
+// Download a file over HTTPS, following GitHub -> S3 redirects.
+function downloadFile(url, dest, redirects){
+    redirects = redirects || 0;
+    return new Promise((res, rej) => {
+        if (redirects > 6) return rej(new Error('too many redirects'));
+        const file = createWriteStream(dest);
+        https.get(url, { headers: { 'User-Agent': 'circuitjs-builder' } }, resp => {
+            if (resp.statusCode >= 300 && resp.statusCode < 400 && resp.headers.location){
+                file.close(); try { rmSync(dest, { force: true }); } catch {}
+                resp.resume();
+                return res(downloadFile(resp.headers.location, dest, redirects + 1));
+            }
+            if (resp.statusCode !== 200){
+                file.close(); try { rmSync(dest, { force: true }); } catch {}
+                resp.resume();
+                return rej(new Error('HTTP ' + resp.statusCode + ' for ' + url));
+            }
+            resp.pipe(file);
+            file.on('finish', () => file.close(() => res()));
+        }).on('error', err => { file.close(); try { rmSync(dest, { force: true }); } catch {} rej(err); });
+    });
+}
+
+// nw-builder mishandles the custom "-mod1" version and downloads a wrong (404 ->
+// 0-byte) archive. So we fetch the correct NW.js mod runtime ourselves and place
+// it at the cache path nw-builder expects, so its build step just extracts it.
+async function ensureNwjsBinary(arch){
+    arch = arch || 'x64';
+    const cacheDir = resolve('./out/nwjs_cache');
+    if (!existsSync(cacheDir)) mkdirSync(cacheDir, { recursive: true });
+    const baseVer = nw_version.split('-')[0];                 // e.g. "0.64.1"
+    const cacheZip = resolve(cacheDir, 'nwjs-v' + baseVer + '-win-' + arch + '.zip');
+
+    if (existsSync(cacheZip) && statSync(cacheZip).size > 5 * 1024 * 1024){
+        console.log('NW.js runtime already cached: ' + cacheZip);
+        return;
+    }
+    if (existsSync(cacheZip)) rmSync(cacheZip, { force: true }); // drop 0-byte/corrupt
+
+    const url = 'https://github.com/SEVA77/nw.js_mod/releases/download/v' + nw_version
+              + '/nwjs-v' + nw_version + '-win-' + arch + '.zip';
+    console.log('Downloading NW.js runtime (~85 MB), please wait...\n  ' + url);
+    await downloadFile(url, cacheZip);
+    const mb = (statSync(cacheZip).size / (1024 * 1024)).toFixed(1);
+    if (statSync(cacheZip).size < 5 * 1024 * 1024)
+        throw new Error('downloaded NW.js archive is too small (' + mb + ' MB) - download failed');
+    console.log('NW.js runtime downloaded: ' + mb + ' MB');
+}
+
+async function buildPortableExe(arch){
+    arch = arch || 'x64';
+    const appDir = resolve('./out/win-' + arch + '/CircuitJS1 Desktop Mod');
+    const appExe = resolve(appDir, 'CircuitSimulator.exe');
+
+    // 1) make sure the GWT app is built, then (re)assemble the NW.js Windows app
+    //    so the .exe always reflects the latest GWT output.
+    if (!stateOfSteps[1]) await buildGWT();        // GWT app (needs JDK + Maven); skipped if already built
+    if (!existsSync(resolve('./target/site/package.json'))){
+        console.error('\nERROR: GWT app not found in ./target/site. Run "npm run buildgwt" first.');
+        return;
+    }
+    await ensureNwjsBinary(arch);                   // robust NW.js download (fixes nw-builder 0-byte/checksum issues)
+    await buildRelease('win', arch);               // extract runtime + bundle the app
+    if (!existsSync(appExe)){
+        console.error('\nERROR: build did not produce ' + appExe);
+        return;
+    }
+
+    // 2) locate 7-Zip (used to compress + self-extract)
+    const sevenZip = find7zPath('7z.exe');
+    const sfx = find7zPath('7z.sfx');
+    if (!sevenZip || !sfx){
+        console.error('\nERROR: 7-Zip not found. Install it from https://www.7-zip.org and retry.');
+        return;
+    }
+
+    // 3) compress the app folder contents into a temporary .7z
+    const archivePath = resolve('./out/_circuitjs_app.7z');
+    const outExe      = resolve('./out/CircuitJS1_Portable_' + arch + '.exe');
+    if (existsSync(archivePath)) rmSync(archivePath);
+
+    console.log('Compressing the app into a single archive (this can take a minute)...');
+    await spawnPromise(sevenZip, ['a', '-mx=5', '-r', archivePath, '*'], { cwd: appDir });
+
+    // 4) SFX config (UTF-8 BOM + extract-to-temp-and-run), then concatenate:
+    //    [ sfx module ] + [ config ] + [ 7z archive ] = self-extracting .exe
+    const configText = ';!@Install@!UTF-8!\r\n'
+        + 'Title="CircuitJS1 Desktop Mod"\r\n'
+        + 'RunProgram="CircuitSimulator.exe"\r\n'
+        + ';!@InstallEnd@!\r\n';
+    const configBuf = Buffer.concat([Buffer.from([0xEF, 0xBB, 0xBF]), Buffer.from(configText, 'utf8')]);
+    writeFileSync(outExe, Buffer.concat([
+        readFileSync(sfx), configBuf, readFileSync(archivePath)
+    ]));
+
+    // 5) clean up the intermediate archive
+    rmSync(archivePath);
+
+    const sizeMB = (statSync(outExe).size / (1024 * 1024)).toFixed(1);
+    console.log('\n✔ Single portable executable created:\n  ' + outExe + '  (' + sizeMB + ' MB)\n'
+        + '  Double-click it to run CircuitJS1 - it unpacks to a temp folder and starts automatically.\n');
 }
 
 function runMenu(){
@@ -377,7 +509,12 @@ function runMenu(){
                 console.log("RUN BUILD FOR MAC OS ARM64");
                 await platformBuild('osx','arm64');
                 break;
-            case 'full': await fullBuild();
+            case 'full': await fullBuild(); break;
+            case 'exe':
+            case 'exe x64':
+                console.log("BUILD SINGLE PORTABLE .EXE (WINDOWS X64)");
+                await buildPortableExe('x64');
+                break;
         }})()
     .then(()=>{
         console.log(menu);
@@ -401,5 +538,6 @@ function runMenu(){
         case "--rungwt": await runGWT(); process.exit(0);
         case "--buildall": await buildAll(); process.exit(0);
         case "--fullrebuild": await fullBuild(); process.exit(0);
+        case "--winexe": await buildPortableExe('x64'); process.exit(0);
     }
 })()

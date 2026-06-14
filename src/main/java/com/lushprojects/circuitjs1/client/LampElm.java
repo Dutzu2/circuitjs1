@@ -28,8 +28,11 @@ class LampElm extends CircuitElm {
 	public LampElm(int xx, int yy) {
 	    super(xx, yy);
 	    temp = roomTemp;
-	    nom_pow = 100;
-	    nom_v = 120;
+	    // Low-voltage bulb (5 V / 1 W) so it lights up clearly in typical
+	    // classroom circuits (the default voltage source is 5 V). The rating
+	    // can be changed by double-clicking the bulb (Nominal Voltage/Power).
+	    nom_pow = 1;
+	    nom_v = 5;
 	    warmTime = .4;
 	    coolTime = .4;
 	    startIteration(); // set resistance
